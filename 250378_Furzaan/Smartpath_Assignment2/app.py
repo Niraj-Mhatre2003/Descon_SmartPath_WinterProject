@@ -53,7 +53,3 @@ def predict_speed(request: PredictionRequest):
         "previous_speed": request.previous_speed,
         "predicted_speed": round(predicted_speed.item(),4)
      }
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host = "0.0.0.0", port = 8000)
