@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SmartPath</title>
+    <meta charset="utf-8" />
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <style>
+        #map {
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            z-index: 1000;
+            border-radius: 6px;
+            font-family: Arial;
+        }
+    </style>
+</head>
+<body>
+
+<div id="info">
+    <b>Specify start and destination points</b>
+    <p id="result"></p>
+</div>
+
+<div id="map"></div>
+
+<script>
+let map = L.map('map', {
+    zoomControl: false
+}).setView([34.05, -118.25], 10);
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+  .addTo(map);
+
+let points = [];
+let markers = [];
+let routeLayer = null;
+
+map.on('click', async function (e) {
+    points.push(e.latlng);
+
+    const marker = L.marker(e.latlng).addTo(map);
+    markers.push(marker);
+
+    if (points.length === 2) {
+
+        const now = new Date();
+
+        const response = await fetch('/route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                source_lat: points[0].lat,
+                source_lng: points[0].lng,
+                dest_lat: points[1].lat,
+                dest_lng: points[1].lng,
+                hour: now.getHours(),
+                day: now.getDay()
+            })
+        });
+
+        const data = await response.json();
+
+        /* Remove previous route */
+        if (routeLayer) {
+            map.removeLayer(routeLayer);
+        }
+
+        routeLayer = L.geoJSON(data.geometry).addTo(map);
+
+        /* Remove markers after use */
+        for (let i = 0; i < markers.length; i++) {
+            map.removeLayer(markers[i]);
+        }
+        markers = [];
+
+        /* Reset click points */
+        points = [];
+
+        const avgSpeed = (data.distance_km / (data.time_min / 60));
+
+        document.getElementById("result").innerHTML =
+            `Distance: ${data.distance_km} km<br>
+            Estimated time: ${Math.round(data.time_min)} min<br>
+            Avg speed: ${avgSpeed.toFixed(2)} km/h`;
+
+    }
+});
+</script>
+
+</body>
+</html>
