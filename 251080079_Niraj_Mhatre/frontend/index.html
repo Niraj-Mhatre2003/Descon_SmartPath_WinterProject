@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SmartPath Map</title>
+  <meta charset="utf-8" />
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet/dist/leaflet.css"
+  />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      height: 85vh;
+    }
+    #info {
+      padding: 12px;
+      font-size: 16px;
+      background: #f4f4f4;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2 style="padding:10px;">SmartPath Route Planner</h2>
+<div id="map"></div>
+<div id="info">Click to select Source and Destination</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+  // ----------------------------
+  // Map initialization
+  // ----------------------------
+  let map = L.map('map').setView([26.5123, 80.2329], 13); // IIT Kanpur
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  let sourceMarker = null;
+  let destMarker = null;
+  let routeLine = null;
+
+  // ----------------------------
+  // Click handling
+  // ----------------------------
+  map.on('click', async function (e) {
+
+    if (!sourceMarker) {
+      sourceMarker = L.marker(e.latlng)
+        .addTo(map)
+        .bindPopup("Source")
+        .openPopup();
+
+      document.getElementById("info").innerHTML =
+        "Source selected. Click to select Destination.";
+
+    } else if (!destMarker) {
+      destMarker = L.marker(e.latlng)
+        .addTo(map)
+        .bindPopup("Destination")
+        .openPopup();
+
+      await sendToBackend();
+    }
+  });
+
+  // ----------------------------
+  // Backend communication
+  // ----------------------------
+  async function sendToBackend() {
+
+    const response = await fetch("http://127.0.0.1:8000/route", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: {
+          lat: sourceMarker.getLatLng().lat,
+          lng: sourceMarker.getLatLng().lng
+        },
+        destination: {
+          lat: destMarker.getLatLng().lat,
+          lng: destMarker.getLatLng().lng
+        }
+      })
+    });
+
+    const data = await response.json();
+    console.log("Backend response:", data);
+
+    // Remove old route if exists
+    if (routeLine) {
+      map.removeLayer(routeLine);
+    }
+
+    // Draw route
+    routeLine = L.polyline(data.route, {
+      color: "blue",
+      weight: 4
+    }).addTo(map);
+
+    // Display info
+    document.getElementById("info").innerHTML = `
+      <b>Distance:</b> ${data.distance_km} km <br>
+      <b>Predicted Speed:</b> ${data.predicted_speed_kmph} km/h <br>
+      <b>Estimated Travel Time:</b> ${data.travel_time_min} minutes
+    `;
+  }
+</script>
+
+</body>
+</html>
